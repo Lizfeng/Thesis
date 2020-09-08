@@ -1,0 +1,113 @@
+---
+title: "HLM Data Cleaning"
+author: "Xin Feng"
+date: "2020/6/14"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+geometry: margin=0.75in
+fontsize: 12pt
+fig_crop: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(Hmisc)
+library(foreign)
+```
+
+```{r}
+setwd("~/Desktop")
+df <- read.spss("Quiz.sav", use.value.label=TRUE, to.data.frame=TRUE)
+```
+
+##To create group variable (Group: 1 = OLI + MOOC, 0: MOOC only)
+```{r}
+for (i in 1:length(df$username)) {
+  if (length(grep(df$username[i], df$user_id)) == 0){
+    df$Group[i] = 0 
+  } 
+  else{
+    df$Group[i] = 1
+  }
+}
+```
+
+##To create pers variable (each pers will have 13 observations (aka 13 quiz scores))
+```{r}
+k = 1
+for (i in 1:1159) {
+  for (j in k:(13*i)){
+    df$pers[j] = i 
+  }
+  k = k+13
+}
+```
+
+##Missing data 
+```{r}
+sum(is.na(df$rawscore))
+#First, to find out all the students who has missing data
+k = 1
+m = 1
+delete_rows <- seq(1:269)
+for (i in 1:1159) {
+     for (j in k:(13*i)){
+        if (is.na(df$rawscore[j]) == 1){
+             delete_rows[m] <- k
+             m = m+1
+             k = k+13
+             break
+         }
+     }
+     if (k < 13*i) {
+         k = k+13
+     }
+}
+
+#Second, to find out all the rows number we need to delete
+delete <- seq(1:3497)
+k = 1
+for (i in 1:269){
+     m = delete_rows[i]
+     for (j in k:(13*i)){
+         delete[j] <- m
+         m = m+1
+     }
+     k = k+13
+}
+
+#Delete the rows from the data
+df_new <- df[-delete, ]
+sum(is.na(df_new$rawscore))
+
+#We have 137 MOOC only students and 753 MOOC + OLI students left 
+df_new %>% group_by(df_new$Group) %>% summarise(count = n())
+1781/13
+9789/13
+```
+
+
+##A brief look at our data
+```{r}
+head(df_new, 30)
+```
+
+##Build another table for hlm level 2
+```{r}
+df2 <- read.csv("QuizClean.csv", header=T)
+df2$X <- NULL
+#Get the sequence of Group
+group <- seq(1:890)
+j = 1
+for (i in 1:890) {
+   group[i] <- df2$Group[j]
+   j = j+13
+}
+df3 <- data.frame("pers" = seq(1:890), "Group" = group)
+head(df3,10)
+```
+
+
